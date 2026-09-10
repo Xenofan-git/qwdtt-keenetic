@@ -10,6 +10,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
+      - name: Extract source archive when present
+        run: |
+          archive=$(find . -maxdepth 1 -type f -name 'qwdtt-entware-*.tar.gz' -print -quit)
+          if [ -n "$archive" ]; then
+            tar -xzf "$archive" --exclude=.git
+          fi
+          test -f go_client/go.mod
+          test -f entware/web/go.mod
+          test -f server/go.mod
       - uses: actions/setup-go@v7
         with:
           go-version: '1.27.x'
@@ -33,7 +42,7 @@ jobs:
           cp build/server/wdtt-server-linux-arm64 dist/deploy/
           sha256sum dist/deploy/* > dist/SHA256SUMS
       - name: Package
-        run: tar -czf qwdtt-entware-${GITHUB_REF_NAME#v}.tar.gz --exclude=.git .
+        run: tar -czf qwdtt-entware-${GITHUB_REF_NAME#v}.tar.gz --exclude=.git --exclude='qwdtt-entware-*.tar.gz' .
       - uses: actions/upload-artifact@v4
         with:
           name: qwdtt-entware-build
