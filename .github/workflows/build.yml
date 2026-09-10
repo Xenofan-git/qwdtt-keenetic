@@ -1,0 +1,44 @@
+name: Build qWDTT Entware
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ['v*']
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v7
+        with:
+          go-version: '1.27.x'
+      - name: Test server
+        working-directory: server
+        run: go test ./...
+      - name: Test client
+        working-directory: go_client
+        run: go test ./...
+      - name: Test web
+        working-directory: entware/web
+        run: go test ./...
+      - name: Build server amd64/arm64
+        run: ./scripts/build-server.sh
+      - name: Build Entware client/web ARM64
+        run: ./scripts/build-arm64.sh
+      - name: Stage deploy binaries
+        run: |
+          mkdir -p dist/deploy
+          cp build/server/wdtt-server-linux-amd64 dist/deploy/
+          cp build/server/wdtt-server-linux-arm64 dist/deploy/
+          sha256sum dist/deploy/* > dist/SHA256SUMS
+      - name: Package
+        run: tar -czf qwdtt-entware-${GITHUB_REF_NAME#v}.tar.gz --exclude=.git .
+      - uses: actions/upload-artifact@v4
+        with:
+          name: qwdtt-entware-build
+          path: |
+            qwdtt-entware-*.tar.gz
+            build/server/*
+            build/arm64/*
+            dist/*
