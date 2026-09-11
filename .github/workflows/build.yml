@@ -160,17 +160,145 @@ jobs:
           mkdir -p ../../build
           CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -o ../../build/wdtt-web-arm64 .
 
-      - name: Stage deploy binaries
+      - name: Stage Entware package
         run: |
-          mkdir -p deploy
-          cp build/wdtt-server-amd64 deploy/wdtt-server
-          cp build/wdtt-client-arm64 deploy/wdtt-client
-          cp build/wdtt-web-arm64 deploy/wdtt-web
+          rm -rf deploy
+          mkdir -p deploy/opt/bin deploy/opt/etc/qwdtt deploy/opt/etc/init.d
 
-      - name: Package
+          cp build/wdtt-client-arm64 deploy/opt/bin/qwdtt
+          cp build/wdtt-web-arm64 deploy/opt/bin/qwdtt-web
+          chmod 0755 deploy/opt/bin/qwdtt deploy/opt/bin/qwdtt-web
+
+          cat > deploy/opt/etc/qwdtt/config.json <<'EOF'
+          {
+            "mode": "socks",
+            "tun_name": "qwdtt0",
+            "gateway_mode": false,
+            "workers": 9,
+            "turn_tcp": false,
+            "obfs": "audio",
+            "vk_auth": "anonymous",
+            "vk_pool_state": "/opt/etc/qwdtt/vk-pool.json",
+            "go_dns": "router",
+            "socks": "0.0.0.0:1301",
+            "socks_auth": false,
+            "hydra_failover_enabled": true,
+            "hydra_proxy_name": "",
+            "hydra_policy": ""
+          }
+          EOF
+
+          cat > deploy/opt/etc/qwdtt/README.conf <<'EOF'
+          qWDTT Entware configuration
+
+          Main config: /opt/etc/qwdtt/config.json
+          SOCKS5: 0.0.0.0:1301, authentication disabled
+          DNS: router (Keenetic 192.168.1.1:53)
+          VK accounts/tokens/hashes are configured through qwdtt-web.
+          Runtime state is stored in /opt/etc/qwdtt/.
+          EOF
+
+          cat > deploy/opt/etc/init.d/S99qwdtt <<'EOF'
+          #!/bin/sh
+          . /opt/etc/init.d/rc.func
+
+          NAME=qwdtt
+          CLIENT=/opt/bin/qwdtt
+          WEB=/opt/bin/qwdtt-web
+          CONF=/opt/etc/qwdtt/config.json
+          PIDFILE=/opt/var/run/qwdtt.pid
+          WEBPIDFILE=/opt/var/run/qwdtt-web.pid
+          LOG=/opt/var/log/qwdtt.log
+
+          start_client() {
+              [ -x "$CLIENT" ] || return 1
+              [ -f "$CONF" ] || return 1
+              mkdir -p /opt/var/run /opt/var/log /opt/etc/qwdtt
+              start-stop-daemon --start --quiet --background --make-pidfile \
+                --pidfile "$PIDFILE" --exec "$CLIENT" -- \
+                -entware-config "$CONF" >>"$LOG" 2>&1
+          }
+
+          start_web() {
+              [ -x "$WEB" ] || return 0
+              mkdir -p /opt/var/run /opt/var/log /opt/etc/qwdtt
+              if [ -f /opt/etc/qwdtt/web.env ]; then
+                  . /opt/etc/qwdtt/web.env
+              fi
+              : "${QWDTT_WEB_LISTEN:=127.0.0.1:8787}"
+              start-stop-daemon --start --quiet --background --make-pidfile \
+                --pidfile "$WEBPIDFILE" --exec "$WEB" >>"/opt/var/log/qwdtt-web.log" 2>&1
+          }
+
+          stop_one() {
+              file="$1"
+              if [ -f "$file" ]; then
+                  kill "$(cat "$file")" 2>/dev/null || true
+                  rm -f "$file"
+              fi
+          }
+
+          case "$1" in
+              start)
+                  start_client
+                  start_web
+                  ;;
+              stop)
+                  stop_one "$WEBPIDFILE"
+                  stop_one "$PIDFILE"
+                  ;;
+              restart)
+                  "$0" stop
+                  sleep 1
+                  "$0" start
+                  ;;
+              status)
+                  printf 'qwdtt: '
+                  [ -f "$PIDFILE" ] && kill -0 "$(cat "$PIDFILE")" 2>/dev/null && echo running || echo stopped
+                  printf 'qwdtt-web: '
+                  [ -f "$WEBPIDFILE" ] && kill -0 "$(cat "$WEBPIDFILE")" 2>/dev/null && echo running || echo stopped
+                  ;;
+              *)
+                  echo "Usage: $0 {start|stop|restart|status}"
+                  exit 1
+                  ;;
+          esac
+          EOF
+          chmod 0755 deploy/opt/etc/init.d/S99qwdtt
+
+          cat > deploy/install.sh <<'EOF'
+          #!/bin/sh
+          set -e
+          mkdir -p /opt/bin /opt/etc/qwdtt /opt/etc/init.d /opt/var/run /opt/var/log
+          cp -f opt/bin/qwdtt /opt/bin/qwdtt
+          cp -f opt/bin/qwdtt-web /opt/bin/qwdtt-web
+          cp -f opt/etc/qwdtt/config.json /opt/etc/qwdtt/config.json
+          cp -f opt/etc/qwdtt/README.conf /opt/etc/qwdtt/README.conf
+          cp -f opt/etc/init.d/S99qwdtt /opt/etc/init.d/S99qwdtt
+          chmod 0755 /opt/bin/qwdtt /opt/bin/qwdtt-web /opt/etc/init.d/S99qwdtt
+          echo 'qWDTT installed. Start with: /opt/etc/init.d/S99qwdtt start'
+          EOF
+          chmod 0755 deploy/install.sh
+
+          cat > deploy/UNINSTALL.sh <<'EOF'
+          #!/bin/sh
+          /opt/etc/init.d/S99qwdtt stop 2>/dev/null || true
+          rm -f /opt/etc/init.d/S99qwdtt /opt/bin/qwdtt /opt/bin/qwdtt-web
+          echo 'qWDTT binaries and init script removed; /opt/etc/qwdtt preserved.'
+          EOF
+          chmod 0755 deploy/UNINSTALL.sh
+
+      - name: Validate Entware package layout
         run: |
-          mkdir -p dist
+          test -x deploy/opt/bin/qwdtt
+          test -x deploy/opt/bin/qwdtt-web
+          test -x deploy/opt/etc/init.d/S99qwdtt
+          test -f deploy/opt/etc/qwdtt/config.json
+          test -f deploy/install.sh
+          test -f deploy/UNINSTALL.sh
+          file deploy/opt/bin/qwdtt deploy/opt/bin/qwdtt-web
           tar -czf dist/qwdtt-entware-1.0.34.tar.gz -C deploy .
+          tar -tzf dist/qwdtt-entware-1.0.34.tar.gz
           sha256sum dist/qwdtt-entware-1.0.34.tar.gz
 
       - name: Upload artifact
