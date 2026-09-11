@@ -99,20 +99,22 @@ jobs:
           import re
           p = Path('server.go')
           lines = p.read_text().splitlines()
-          # The source has a struct field named deploy and a method named deploy.
-          # Rename only the field and its indexing uses; keep method calls intact.
           for i, line in enumerate(lines):
               if re.match(r'^\s*deploy\s+(map\[|\[)', line):
                   lines[i] = line.replace('deploy', 'deployCfg', 1)
           s = '\n'.join(lines) + '\n'
           s = re.sub(r'\ba\.deploy\[', 'a.deployCfg[', s)
+          s = re.sub(r'(?m)^(\s*)a := &App\{root: filepath.Join\(root, "web"\), cfgPath: filepath.Join\(root, "store.json"\), )deploy:', r'\1a := &App{root: filepath.Join(root, "web"), cfgPath: filepath.Join(root, "store.json"), deployCfg:', s)
+          marker = '\t// true end-to-end connectivity probe above.\n\t}\n\nfunc ifacePresent'
+          if marker in s:
+              s = s.replace(marker, '\t// true end-to-end connectivity probe above.\n\treturn true\n}\n\nfunc ifacePresent', 1)
           p.write_text(s)
           PY
           gofmt -w server.go
           echo '--- web deploy references ---'
           grep -nE '\bdeploy(Cfg)?\b' server.go | head -40
-          echo '--- web tail around reported missing return ---'
-          nl -ba server.go | sed -n '1925,1965p'
+          echo '--- web health function ---'
+          nl -ba server.go | sed -n '1935,1960p'
       - uses: actions/setup-go@v7
         with:
           go-version: '1.27.x'
