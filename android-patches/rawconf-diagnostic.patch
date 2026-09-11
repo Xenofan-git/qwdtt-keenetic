@@ -1,0 +1,11 @@
+--- a/go_client/protocol.go
++++ b/go_client/protocol.go
+@@ -73,7 +73,7 @@
+ 	n, readErr := conn.Read(b)
+ 	_ = conn.SetReadDeadline(time.Time{})
+ 	if readErr != nil {
+-		return "", "", 0, fmt.Errorf("чтение ответа RAWCONF: %w", readErr)
++		return "", "", 0, fmt.Errorf("чтение ответа RAWCONF (local=%s remote=%s): %w", conn.LocalAddr(), conn.RemoteAddr(), readErr)
+ 	}
+ 
+ 	resp := string(b[:n])
