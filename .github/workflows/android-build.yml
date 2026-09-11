@@ -1,0 +1,79 @@
+name: Build patched Android qWDTT
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'proxy-turn-vk-android-1.4.3.tar.gz'
+      - 'android-patches/**'
+      - '.github/workflows/android-build.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-android:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Extract Android source
+        run: |
+          rm -rf android-src
+          mkdir android-src
+          tar -xzf proxy-turn-vk-android-1.4.3.tar.gz -C android-src --strip-components=1
+          test -f android-src/app/src/main/assets/deploy.sh
+          test -f android-src/go_client/protocol.go
+          test -f android-src/server/main.go
+
+      - name: Validate Android port map
+        working-directory: android-src
+        shell: bash
+        run: |
+          grep -q 'serverRawPort.*else.*56003\|else 56003' app/src/main/java/com/wdtt/client/tunnel/TunnelService.kt
+          grep -q 'serverDtlsPort.*else.*56000\|else 56000' app/src/main/java/com/wdtt/client/tunnel/TunnelService.kt
+          grep -q 'serverWgPort.*else.*56001\|else 56001' app/src/main/java/com/wdtt/client/tunnel/TunnelService.kt
+          grep -q 'serverDirectPort.*else.*56002\|else 56002' app/src/main/java/com/wdtt/client/tunnel/TunnelService.kt
+
+      - name: Apply Android RAW fixes
+        working-directory: android-src
+        run: |
+          patch -p1 < ../android-patches/rawconf-diagnostic.patch
+          patch -p1 < ../android-patches/raw-listener-default.patch
+          grep -q 'RAW_PORT="${WDTT_RAW_PORT:-56003}"' app/src/main/assets/deploy.sh
+          grep -q 'local=%s remote=%s' go_client/protocol.go
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: gradle
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.26.x'
+          cache-dependency-path: |
+            android-src/go.sum
+            android-src/go_client/go.sum
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android SDK packages
+        run: sdkmanager "platforms;android-35" "build-tools;35.0.0" "ndk;27.2.12479018"
+
+      - name: Build patched debug APK
+        working-directory: android-src
+        run: ./gradlew :app:assembleDebug -PtargetAbis=arm64-v8a --no-daemon
+
+      - name: Upload patched APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: qwdtt-android-1.4.3-rawfix-arm64
+          path: android-src/app/build/outputs/apk/debug/app-arm64-v8a-debug.apk
+          if-no-files-found: error
+          retention-days: 14
