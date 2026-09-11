@@ -47,6 +47,14 @@ jobs:
           mv nat.go.tmp nat.go
           gofmt -w nat.go
           grep -n 'iptComment' nat.go
+      - name: Capture client source for diagnosis
+        if: always()
+        run: tar -czf /tmp/qwdtt-go-client-source.tar.gz go_client
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: qwdtt-go-client-source
+          path: /tmp/qwdtt-go-client-source.tar.gz
       - uses: actions/setup-go@v7
         with:
           go-version: '1.27.x'
