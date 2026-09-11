@@ -162,8 +162,8 @@ jobs:
 
       - name: Stage Entware package
         run: |
-          rm -rf deploy
-          mkdir -p deploy/opt/bin deploy/opt/etc/qwdtt deploy/opt/etc/init.d
+          rm -rf deploy dist
+          mkdir -p deploy/opt/bin deploy/opt/etc/qwdtt deploy/opt/etc/init.d dist
 
           cp build/wdtt-client-arm64 deploy/opt/bin/qwdtt
           cp build/wdtt-web-arm64 deploy/opt/bin/qwdtt-web
@@ -190,7 +190,6 @@ jobs:
 
           cat > deploy/opt/etc/qwdtt/README.conf <<'EOF'
           qWDTT Entware configuration
-
           Main config: /opt/etc/qwdtt/config.json
           SOCKS5: 0.0.0.0:1301, authentication disabled
           DNS: router (Keenetic 192.168.1.1:53)
@@ -202,7 +201,6 @@ jobs:
           #!/bin/sh
           . /opt/etc/init.d/rc.func
 
-          NAME=qwdtt
           CLIENT=/opt/bin/qwdtt
           WEB=/opt/bin/qwdtt-web
           CONF=/opt/etc/qwdtt/config.json
@@ -222,12 +220,8 @@ jobs:
           start_web() {
               [ -x "$WEB" ] || return 0
               mkdir -p /opt/var/run /opt/var/log /opt/etc/qwdtt
-              if [ -f /opt/etc/qwdtt/web.env ]; then
-                  . /opt/etc/qwdtt/web.env
-              fi
-              : "${QWDTT_WEB_LISTEN:=127.0.0.1:8787}"
               start-stop-daemon --start --quiet --background --make-pidfile \
-                --pidfile "$WEBPIDFILE" --exec "$WEB" >>"/opt/var/log/qwdtt-web.log" 2>&1
+                --pidfile "$WEBPIDFILE" --exec "$WEB" >>/opt/var/log/qwdtt-web.log 2>&1
           }
 
           stop_one() {
@@ -239,29 +233,16 @@ jobs:
           }
 
           case "$1" in
-              start)
-                  start_client
-                  start_web
-                  ;;
-              stop)
-                  stop_one "$WEBPIDFILE"
-                  stop_one "$PIDFILE"
-                  ;;
-              restart)
-                  "$0" stop
-                  sleep 1
-                  "$0" start
-                  ;;
+              start) start_client; start_web ;;
+              stop) stop_one "$WEBPIDFILE"; stop_one "$PIDFILE" ;;
+              restart) "$0" stop; sleep 1; "$0" start ;;
               status)
                   printf 'qwdtt: '
                   [ -f "$PIDFILE" ] && kill -0 "$(cat "$PIDFILE")" 2>/dev/null && echo running || echo stopped
                   printf 'qwdtt-web: '
                   [ -f "$WEBPIDFILE" ] && kill -0 "$(cat "$WEBPIDFILE")" 2>/dev/null && echo running || echo stopped
                   ;;
-              *)
-                  echo "Usage: $0 {start|stop|restart|status}"
-                  exit 1
-                  ;;
+              *) echo "Usage: $0 {start|stop|restart|status}"; exit 1 ;;
           esac
           EOF
           chmod 0755 deploy/opt/etc/init.d/S99qwdtt
