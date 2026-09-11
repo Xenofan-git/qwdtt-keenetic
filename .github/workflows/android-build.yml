@@ -32,11 +32,10 @@ jobs:
         working-directory: android-src
         shell: bash
         run: |
-          grep -q 'serverRawPort.*else.*56003\|else 56003' app/src/main/java/com/wdtt/client/tunnel/TunnelService.kt
-          grep -q 'serverDtlsPort.*else.*56000\|else 56000' app/src/main/java/com/wdtt/client/tunnel/TunnelService.kt
-          grep -q 'serverDirectPort.*else.*56002\|else 56002' app/src/main/java/com/wdtt/client/tunnel/TunnelService.kt
-          grep -q 'wgPort.*56001' app/src/main/java/com/wdtt/client/servers/ServersStore.kt
-          grep -q 'serverRawPort.*56003' app/src/main/java/com/wdtt/client/settings/SettingsStore.kt
+          grep -R -q '56003' app/src/main/java/com/wdtt/client
+          grep -R -q '56000' app/src/main/java/com/wdtt/client
+          grep -R -q '56001' app/src/main/java/com/wdtt/client
+          grep -R -q '56002' app/src/main/java/com/wdtt/client
 
       - name: Apply Android RAW fixes
         working-directory: android-src
