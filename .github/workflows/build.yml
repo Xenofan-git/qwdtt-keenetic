@@ -24,7 +24,7 @@ jobs:
         working-directory: server
         run: |
           if grep -q 'iptComment' nat.go && ! grep -Rqs 'const iptComment\|var iptComment' --include='*.go' .; then
-            sed -i '1a const iptComment = "WDTT_MANAGED"' nat.go
+            sed -i '/^func /i const iptComment = "WDTT_MANAGED"' nat.go
           fi
           grep -n 'iptComment' nat.go
       - uses: actions/setup-go@v7
