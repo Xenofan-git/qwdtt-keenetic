@@ -91,6 +91,28 @@ jobs:
           gofmt -w go_client/group.go go_client/main.go go_client/vk_account.go go_client/vk_hash_generator.go
           grep -n 'entwareConfigPath\|mtu, err :=\|vkAccessTokenValue' go_client/main.go go_client/vk_account.go
           grep -n '"log"' go_client/vk_hash_generator.go
+      - name: Fix web compile errors
+        working-directory: entware/web
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          p = Path('server.go')
+          lines = p.read_text().splitlines()
+          # The source has a struct field named deploy and a method named deploy.
+          # Rename only the field and its indexing uses; keep method calls intact.
+          for i, line in enumerate(lines):
+              if re.match(r'^\s*deploy\s+(map\[|\[)', line):
+                  lines[i] = line.replace('deploy', 'deployCfg', 1)
+          s = '\n'.join(lines) + '\n'
+          s = re.sub(r'\ba\.deploy\[', 'a.deployCfg[', s)
+          p.write_text(s)
+          PY
+          gofmt -w server.go
+          echo '--- web deploy references ---'
+          grep -nE '\bdeploy(Cfg)?\b' server.go | head -40
+          echo '--- web tail around reported missing return ---'
+          nl -ba server.go | sed -n '1925,1965p'
       - uses: actions/setup-go@v7
         with:
           go-version: '1.27.x'
