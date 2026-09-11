@@ -58,13 +58,11 @@ jobs:
           if '"fmt"' not in s:
               s = s.replace('import (\n', 'import (\n\t"fmt"\n', 1)
           p.write_text(s)
-
           p = Path('go_client/vk_account.go')
           s = p.read_text()
           if 'vkAccessTokenValue' not in s.split('var (', 1)[1].split(')', 1)[0]:
               s = s.replace('var (\n\tvkAuthModeValue', 'var (\n\tvkAccessTokenValue atomic.Value\n\tvkAuthModeValue', 1)
           p.write_text(s)
-
           p = Path('go_client/main.go')
           s = p.read_text()
           s = s.replace('entwareConfig := flag.String("-entware-config", "", "Entware JSON config file")', 'entwareConfigPath := flag.String("-entware-config", "", "Entware JSON config file")')
@@ -79,7 +77,6 @@ jobs:
           if old in s and 'mtu, err := strconv.Atoi(strings.TrimSpace(mtuStr))' not in s:
               s = s.replace(old, new, 1)
           p.write_text(s)
-
           p = Path('go_client/vk_hash_generator.go')
           s = p.read_text()
           if '"log"' not in s:
@@ -90,8 +87,6 @@ jobs:
           p.write_text(s)
           PY
           gofmt -w go_client/group.go go_client/main.go go_client/vk_account.go go_client/vk_hash_generator.go
-          grep -n 'entwareConfigPath\|mtu, err :=\|vkAccessTokenValue' go_client/main.go go_client/vk_account.go
-          grep -n '"log"' go_client/vk_hash_generator.go
 
       - name: Fix web compile errors
         working-directory: entware/web
@@ -99,7 +94,6 @@ jobs:
           python3 - <<'PY'
           from pathlib import Path
           import re
-
           p = Path('server.go')
           lines = p.read_text().splitlines()
           for i, line in enumerate(lines):
@@ -110,8 +104,7 @@ jobs:
           s = '\n'.join(lines) + '\n'
           s = s.replace('a.deploy[', 'a.deployCfg[')
           s = s.replace('jsonOut(w, a.deploy)', 'jsonOut(w, a.deployCfg)')
-          s = s.replace('cfgPath: filepath.Join(root, "store.json"), deploy:',
-                        'cfgPath: filepath.Join(root, "store.json"), deployCfg:')
+          s = s.replace('cfgPath: filepath.Join(root, "store.json"), deploy:', 'cfgPath: filepath.Join(root, "store.json"), deployCfg:')
           lines = s.splitlines()
           iface = next((i for i, line in enumerate(lines) if line.startswith('func ifacePresent(')), None)
           if iface is not None:
@@ -129,8 +122,6 @@ jobs:
           p.write_text('\n'.join(lines) + '\n')
           PY
           gofmt -w server.go
-          grep -nE '\bdeploy(Cfg)?\b' server.go | head -40
-          nl -ba server.go | sed -n '1935,1960p'
 
       - uses: actions/setup-go@v7
         with:
@@ -175,7 +166,6 @@ jobs:
           cp build/wdtt-server-amd64 deploy/wdtt-server
           cp build/wdtt-client-arm64 deploy/wdtt-client
           cp build/wdtt-web-arm64 deploy/wdtt-web
-          test -f deploy/deploy.sh || true
 
       - name: Package
         run: |
