@@ -1,16 +1,16 @@
-name: Build qWDTT Entware
+name: Build qWDTT Keenetic
 
 on:
-  workflow_dispatch:
   push:
-    branches: [main]
-    tags: ['v*']
+    branches: [ main ]
+  workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
+
       - name: Extract source archive when present
         run: |
           archive=$(find . -maxdepth 1 -type f -name 'qwdtt-entware-*.tar.gz' -print -quit)
@@ -20,6 +20,7 @@ jobs:
           test -f go_client/go.mod
           test -f entware/web/go.mod
           test -f server/go.mod
+
       - name: Fix server NAT comment constant
         working-directory: server
         run: |
@@ -47,11 +48,11 @@ jobs:
           mv nat.go.tmp nat.go
           gofmt -w nat.go
           grep -n 'iptComment' nat.go
+
       - name: Fix client compile errors
         run: |
           python3 - <<'PY'
           from pathlib import Path
-
           p = Path('go_client/group.go')
           s = p.read_text()
           if '"fmt"' not in s:
@@ -91,6 +92,7 @@ jobs:
           gofmt -w go_client/group.go go_client/main.go go_client/vk_account.go go_client/vk_hash_generator.go
           grep -n 'entwareConfigPath\|mtu, err :=\|vkAccessTokenValue' go_client/main.go go_client/vk_account.go
           grep -n '"log"' go_client/vk_hash_generator.go
+
       - name: Fix web compile errors
         working-directory: entware/web
         run: |
@@ -101,36 +103,37 @@ jobs:
           p = Path('server.go')
           lines = p.read_text().splitlines()
 
-          # Rename only the App struct field; tolerate any amount of whitespace.
+          # Rename only the App struct field, not the deploy() method.
           for i, line in enumerate(lines):
-              stripped = line.lstrip()
-              if re.match(r'^deploy\s+map\[string\]\*DeployJob\s*$', stripped):
-                  indent = line[:len(line) - len(stripped)]
-                  lines[i] = indent + re.sub(r'^deploy\s+', 'deployCfg ', stripped)
+              if re.match(r'^\s*deploy\s+map\[string\]\*DeployJob\s*$', line):
+                  indent = line[:len(line) - len(line.lstrip())]
+                  lines[i] = indent + 'deployCfg map[string]*DeployJob'
                   break
 
           s = '\n'.join(lines) + '\n'
-
-          # Rename field selectors and the App literal, but keep func (a *App) deploy(...).
           s = s.replace('a.deploy[', 'a.deployCfg[')
           s = s.replace('jsonOut(w, a.deploy)', 'jsonOut(w, a.deployCfg)')
           s = s.replace('cfgPath: filepath.Join(root, "store.json"), deploy:',
                         'cfgPath: filepath.Join(root, "store.json"), deployCfg:')
 
-          # Ensure clientHeartbeatHealthy returns true at its actual end.
+          # Fix the health function by locating ifacePresent and inserting a return
+          # immediately before the closing brace of the preceding function.
           lines = s.splitlines()
-          for i, line in enumerate(lines):
-              if line.startswith('func ifacePresent('):
-                  j = i - 1
-                  while j >= 0 and not lines[j].strip():
-                      j -= 1
-                  if j >= 0 and lines[j].strip() == '}':
-                      # Only insert if the health function currently ends without return true.
-                      block = '\n'.join(lines[max(0, j-25):j])
+          iface = next((i for i, line in enumerate(lines)
+                        if line.startswith('func ifacePresent(')), None)
+          if iface is not None:
+              j = iface - 1
+              while j >= 0 and not lines[j].strip():
+                  j -= 1
+              if j >= 0 and lines[j].strip() == '}':
+                  # Find the opening function declaration above this closing brace.
+                  start = j
+                  while start >= 0 and not lines[start].startswith('func clientHeartbeatHealthy('):
+                      start -= 1
+                  if start >= 0:
+                      block = '\n'.join(lines[start:j+1])
                       if 'return true' not in block:
                           lines.insert(j, '\treturn true')
-                  break
-
           p.write_text('\n'.join(lines) + '\n')
           PY
           gofmt -w server.go
@@ -138,35 +141,55 @@ jobs:
           grep -nE '\bdeploy(Cfg)?\b' server.go | head -40
           echo '--- web health function ---'
           nl -ba server.go | sed -n '1935,1960p'
+
       - uses: actions/setup-go@v7
         with:
           go-version: '1.27.x'
+          check-latest: false
+          cache: true
+
       - name: Test server
         working-directory: server
         run: go test ./...
+
       - name: Test client
         working-directory: go_client
         run: go test ./...
+
       - name: Test web
         working-directory: entware/web
         run: go mod tidy && go test ./...
+
       - name: Build server amd64/arm64
-        run: ./scripts/build-server.sh
+        working-directory: server
+        run: |
+          mkdir -p ../build
+          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o ../build/wdtt-server-amd64 .
+          CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -o ../build/wdtt-server-arm64 .
+
       - name: Build Entware client/web ARM64
-        run: ./scripts/build-arm64.sh
+        run: |
+          mkdir -p build
+          CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -o build/wdtt-client-arm64 ./go_client
+          CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -o build/wdtt-web-arm64 ./entware/web
+
       - name: Stage deploy binaries
         run: |
-          mkdir -p dist/deploy
-          cp build/server/wdtt-server-linux-amd64 dist/deploy/
-          cp build/server/wdtt-server-linux-arm64 dist/deploy/
-          sha256sum dist/deploy/* > dist/SHA256SUMS
+          mkdir -p deploy
+          cp build/wdtt-server-amd64 deploy/wdtt-server
+          cp build/wdtt-client-arm64 deploy/wdtt-client
+          cp build/wdtt-web-arm64 deploy/wdtt-web
+          test -f deploy/deploy.sh || true
+
       - name: Package
-        run: tar -czf qwdtt-entware-${GITHUB_REF_NAME#v}.tar.gz --exclude=.git --exclude='qwdtt-entware-*.tar.gz' .
-      - uses: actions/upload-artifact@v4
+        run: |
+          mkdir -p dist
+          tar -czf dist/qwdtt-entware-1.0.34.tar.gz -C deploy .
+          sha256sum dist/qwdtt-entware-1.0.34.tar.gz
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
         with:
-          name: qwdtt-entware-build
-          path: |
-            qwdtt-entware-*.tar.gz
-            build/server/*
-            build/arm64/*
-            dist/*
+          name: qwdtt-entware-1.0.34
+          path: dist/qwdtt-entware-1.0.34.tar.gz
+          if-no-files-found: error
