@@ -102,31 +102,23 @@ jobs:
 
           p = Path('server.go')
           lines = p.read_text().splitlines()
-
-          # Rename only the App struct field, not the deploy() method.
           for i, line in enumerate(lines):
               if re.match(r'^\s*deploy\s+map\[string\]\*DeployJob\s*$', line):
                   indent = line[:len(line) - len(line.lstrip())]
                   lines[i] = indent + 'deployCfg map[string]*DeployJob'
                   break
-
           s = '\n'.join(lines) + '\n'
           s = s.replace('a.deploy[', 'a.deployCfg[')
           s = s.replace('jsonOut(w, a.deploy)', 'jsonOut(w, a.deployCfg)')
           s = s.replace('cfgPath: filepath.Join(root, "store.json"), deploy:',
                         'cfgPath: filepath.Join(root, "store.json"), deployCfg:')
-
-          # Fix the health function by locating ifacePresent and inserting a return
-          # immediately before the closing brace of the preceding function.
           lines = s.splitlines()
-          iface = next((i for i, line in enumerate(lines)
-                        if line.startswith('func ifacePresent(')), None)
+          iface = next((i for i, line in enumerate(lines) if line.startswith('func ifacePresent(')), None)
           if iface is not None:
               j = iface - 1
               while j >= 0 and not lines[j].strip():
                   j -= 1
               if j >= 0 and lines[j].strip() == '}':
-                  # Find the opening function declaration above this closing brace.
                   start = j
                   while start >= 0 and not lines[start].startswith('func clientHeartbeatHealthy('):
                       start -= 1
@@ -137,9 +129,7 @@ jobs:
           p.write_text('\n'.join(lines) + '\n')
           PY
           gofmt -w server.go
-          echo '--- web deploy references ---'
           grep -nE '\bdeploy(Cfg)?\b' server.go | head -40
-          echo '--- web health function ---'
           nl -ba server.go | sed -n '1935,1960p'
 
       - uses: actions/setup-go@v7
@@ -167,11 +157,17 @@ jobs:
           CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o ../build/wdtt-server-amd64 .
           CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -o ../build/wdtt-server-arm64 .
 
-      - name: Build Entware client/web ARM64
+      - name: Build Entware client ARM64
+        working-directory: go_client
         run: |
-          mkdir -p build
-          CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -o build/wdtt-client-arm64 ./go_client
-          CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -o build/wdtt-web-arm64 ./entware/web
+          mkdir -p ../build
+          CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -o ../build/wdtt-client-arm64 .
+
+      - name: Build Entware web ARM64
+        working-directory: entware/web
+        run: |
+          mkdir -p ../../build
+          CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -o ../../build/wdtt-web-arm64 .
 
       - name: Stage deploy binaries
         run: |
