@@ -96,32 +96,42 @@ jobs:
         run: |
           python3 - <<'PY'
           from pathlib import Path
-          p = Path('server.go')
-          s = p.read_text()
+          import re
 
-          # Rename the struct field regardless of spacing between the field name and type.
-          lines = s.splitlines()
+          p = Path('server.go')
+          lines = p.read_text().splitlines()
+
+          # Rename only the App struct field; tolerate any amount of whitespace.
           for i, line in enumerate(lines):
               stripped = line.lstrip()
-              if stripped.startswith('deploy ') and ('map[' in stripped or stripped.startswith('deploy [')):
+              if re.match(r'^deploy\s+map\[string\]\*DeployJob\s*$', stripped):
                   indent = line[:len(line) - len(stripped)]
-                  lines[i] = indent + 'deployCfg' + stripped[len('deploy'):]
+                  lines[i] = indent + re.sub(r'^deploy\s+', 'deployCfg ', stripped)
                   break
+
           s = '\n'.join(lines) + '\n'
 
-          # Rename selectors and the struct literal key without regex.
+          # Rename field selectors and the App literal, but keep func (a *App) deploy(...).
           s = s.replace('a.deploy[', 'a.deployCfg[')
           s = s.replace('jsonOut(w, a.deploy)', 'jsonOut(w, a.deployCfg)')
           s = s.replace('cfgPath: filepath.Join(root, "store.json"), deploy:',
                         'cfgPath: filepath.Join(root, "store.json"), deployCfg:')
 
-          # Restore the missing return at the end of the health handler.
-          marker = '\t// true end-to-end connectivity probe above.\n\t}\n\nfunc ifacePresent'
-          replacement = '\t// true end-to-end connectivity probe above.\n\treturn true\n}\n\nfunc ifacePresent'
-          if marker in s:
-              s = s.replace(marker, replacement, 1)
+          # Ensure clientHeartbeatHealthy returns true at its actual end.
+          lines = s.splitlines()
+          for i, line in enumerate(lines):
+              if line.startswith('func ifacePresent('):
+                  j = i - 1
+                  while j >= 0 and not lines[j].strip():
+                      j -= 1
+                  if j >= 0 and lines[j].strip() == '}':
+                      # Only insert if the health function currently ends without return true.
+                      block = '\n'.join(lines[max(0, j-25):j])
+                      if 'return true' not in block:
+                          lines.insert(j, '\treturn true')
+                  break
 
-          p.write_text(s)
+          p.write_text('\n'.join(lines) + '\n')
           PY
           gofmt -w server.go
           echo '--- web deploy references ---'
