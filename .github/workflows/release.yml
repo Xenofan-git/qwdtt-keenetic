@@ -1,0 +1,49 @@
+name: Release qWDTT Entware
+
+on:
+  workflow_run:
+    workflows: ["Build qWDTT Keenetic"]
+    types: [completed]
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  release:
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download build artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_ID: ${{ github.event.workflow_run.id }}
+        run: |
+          mkdir -p dist
+          artifact_id=$(gh api \
+            -H 'Accept: application/vnd.github+json' \
+            "/repos/${GITHUB_REPOSITORY}/actions/runs/${RUN_ID}/artifacts" \
+            --jq '.artifacts[] | select(.expired == false and .name == "qwdtt-entware-1.0.34") | .id' \
+            | head -1)
+          test -n "$artifact_id"
+          gh api \
+            -H 'Accept: application/vnd.github+json' \
+            "/repos/${GITHUB_REPOSITORY}/actions/artifacts/${artifact_id}/zip" \
+            > /tmp/artifact.zip
+          unzip -q /tmp/artifact.zip -d /tmp/artifact
+          find /tmp/artifact -type f -name 'qwdtt-entware-1.0.34.tar.gz' -exec cp {} dist/qwdtt-entware-1.0.34.tar.gz \;
+          test -f dist/qwdtt-entware-1.0.34.tar.gz
+          sha256sum dist/qwdtt-entware-1.0.34.tar.gz
+
+      - name: Publish GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_ID: ${{ github.event.workflow_run.id }}
+          SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          tag="v1.0.34-build.${RUN_ID}"
+          gh release create "$tag" dist/qwdtt-entware-1.0.34.tar.gz \
+            --repo "$GITHUB_REPOSITORY" \
+            --target "$SHA" \
+            --title "qWDTT Entware $tag" \
+            --generate-notes
