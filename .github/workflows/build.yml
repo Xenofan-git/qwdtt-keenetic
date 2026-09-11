@@ -96,14 +96,22 @@ jobs:
         run: |
           python3 - <<'PY'
           from pathlib import Path
-          import re
           p = Path('server.go')
           s = p.read_text()
 
-          # Rename the field, while keeping the deploy() method name intact.
-          s = s.replace('\tdeploy map[', '\tdeployCfg map[', 1)
-          s = s.replace('\tdeploy [', '\tdeployCfg [', 1)
+          # Rename the struct field regardless of spacing between the field name and type.
+          lines = s.splitlines()
+          for i, line in enumerate(lines):
+              stripped = line.lstrip()
+              if stripped.startswith('deploy ') and ('map[' in stripped or stripped.startswith('deploy [')):
+                  indent = line[:len(line) - len(stripped)]
+                  lines[i] = indent + 'deployCfg' + stripped[len('deploy'):]
+                  break
+          s = '\n'.join(lines) + '\n'
+
+          # Rename selectors and the struct literal key without regex.
           s = s.replace('a.deploy[', 'a.deployCfg[')
+          s = s.replace('jsonOut(w, a.deploy)', 'jsonOut(w, a.deployCfg)')
           s = s.replace('cfgPath: filepath.Join(root, "store.json"), deploy:',
                         'cfgPath: filepath.Join(root, "store.json"), deployCfg:')
 
