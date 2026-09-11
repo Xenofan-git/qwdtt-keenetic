@@ -1,0 +1,10 @@
+--- a/app/src/main/assets/deploy.sh
++++ b/app/src/main/assets/deploy.sh
+@@ -19,7 +19,7 @@
+ # Пусто = выключено. Экспериментальный порт для клиентов без DTLS (RTP-obfs AEAD напрямую).
+ readonly DIRECT_PORT="${WDTT_DIRECT_PORT:-}"
+ # Пусто = выключено. Экспериментальный порт для raw-IP клиентов без WireGuard (свой TUN/NAT).
+-readonly RAW_PORT="${WDTT_RAW_PORT:-}"
++readonly RAW_PORT="${WDTT_RAW_PORT:-56003}"
+ readonly ADMIN_ID="${WDTT_ADMIN_ID:-}"
+ readonly DNS_SERVERS="${WDTT_DNS_SERVERS:-1.1.1.1,1.0.0.1}"
