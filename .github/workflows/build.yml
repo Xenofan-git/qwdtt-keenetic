@@ -98,16 +98,21 @@ jobs:
           from pathlib import Path
           import re
           p = Path('server.go')
-          lines = p.read_text().splitlines()
-          for i, line in enumerate(lines):
-              if re.match(r'^\s*deploy\s+(map\[|\[)', line):
-                  lines[i] = line.replace('deploy', 'deployCfg', 1)
-          s = '\n'.join(lines) + '\n'
-          s = re.sub(r'\ba\.deploy\[', 'a.deployCfg[', s)
-          s = re.sub(r'(?m)^(\s*)a := &App\{root: filepath.Join\(root, "web"\), cfgPath: filepath.Join\(root, "store.json"\), )deploy:', r'\1a := &App{root: filepath.Join(root, "web"), cfgPath: filepath.Join(root, "store.json"), deployCfg:', s)
+          s = p.read_text()
+
+          # Rename the field, while keeping the deploy() method name intact.
+          s = s.replace('\tdeploy map[', '\tdeployCfg map[', 1)
+          s = s.replace('\tdeploy [', '\tdeployCfg [', 1)
+          s = s.replace('a.deploy[', 'a.deployCfg[')
+          s = s.replace('cfgPath: filepath.Join(root, "store.json"), deploy:',
+                        'cfgPath: filepath.Join(root, "store.json"), deployCfg:')
+
+          # Restore the missing return at the end of the health handler.
           marker = '\t// true end-to-end connectivity probe above.\n\t}\n\nfunc ifacePresent'
+          replacement = '\t// true end-to-end connectivity probe above.\n\treturn true\n}\n\nfunc ifacePresent'
           if marker in s:
-              s = s.replace(marker, '\t// true end-to-end connectivity probe above.\n\treturn true\n}\n\nfunc ifacePresent', 1)
+              s = s.replace(marker, replacement, 1)
+
           p.write_text(s)
           PY
           gofmt -w server.go
