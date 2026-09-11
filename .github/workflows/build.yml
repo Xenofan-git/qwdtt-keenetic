@@ -23,42 +23,28 @@ jobs:
       - name: Fix server NAT comment constant
         working-directory: server
         run: |
-          if grep -q 'iptComment' nat.go && ! grep -Rqs 'const iptComment\|var iptComment' --include='*.go' .; then
-            python3 - <<'PY'
-from pathlib import Path
-
-p = Path('nat.go')
-s = p.read_text()
-const = 'const iptComment = "WDTT_MANAGED"\n\n'
-
-if 'const iptComment' not in s and 'var iptComment' not in s:
-    lines = s.splitlines(keepends=True)
-    insert_at = None
-
-    for i, line in enumerate(lines):
-        if line.startswith('import ('):
-            depth_end = None
-            for j in range(i + 1, len(lines)):
-                if lines[j].strip() == ')':
-                    depth_end = j + 1
-                    break
-            if depth_end is not None:
-                insert_at = depth_end
-            break
-
-    if insert_at is None:
-        for i, line in enumerate(lines):
-            if line.startswith('import '):
-                insert_at = i + 1
-                break
-
-    if insert_at is None:
-        raise SystemExit('Could not locate Go import declaration in server/nat.go')
-
-    lines.insert(insert_at, const)
-    p.write_text(''.join(lines))
-PY
-          fi
+          awk '
+            /^[[:space:]]*(const|var)[[:space:]]+iptComment[[:space:]]*=/ { next }
+            /^import[[:space:]]*\(/ { print; in_import=1; next }
+            in_import && /^[[:space:]]*\)/ {
+              print
+              print "const iptComment = \"WDTT_MANAGED\""
+              print ""
+              in_import=0
+              inserted=1
+              next
+            }
+            /^import[[:space:]]+"/ && !inserted {
+              print
+              print ""
+              print "const iptComment = \"WDTT_MANAGED\""
+              print ""
+              inserted=1
+              next
+            }
+            { print }
+          ' nat.go > nat.go.tmp
+          mv nat.go.tmp nat.go
           gofmt -w nat.go
           grep -n 'iptComment' nat.go
       - uses: actions/setup-go@v7
