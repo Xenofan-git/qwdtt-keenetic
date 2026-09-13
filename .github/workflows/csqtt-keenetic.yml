@@ -56,6 +56,9 @@ jobs:
           wget -q https://musl.cc/aarch64-linux-musl-cross.tgz
           sudo tar -xzf aarch64-linux-musl-cross.tgz -C /opt
           echo "/opt/aarch64-linux-musl-cross/bin" >> "$GITHUB_PATH"
+          test -x /opt/aarch64-linux-musl-cross/bin/aarch64-linux-musl-gcc
+          test -x /opt/aarch64-linux-musl-cross/bin/aarch64-linux-musl-g++
+          test -x /opt/aarch64-linux-musl-cross/bin/aarch64-linux-musl-ar
           /opt/aarch64-linux-musl-cross/bin/aarch64-linux-musl-gcc --version
           /opt/aarch64-linux-musl-cross/bin/aarch64-linux-musl-g++ --version
 
@@ -66,7 +69,12 @@ jobs:
           CC_aarch64_unknown_linux_musl: aarch64-linux-musl-gcc
           CXX_aarch64_unknown_linux_musl: aarch64-linux-musl-g++
           AR_aarch64_unknown_linux_musl: aarch64-linux-musl-ar
+          CARGO_TARGET_AARCH64_UNKNOWN_LINUX_MUSL_LINKER: aarch64-linux-musl-gcc
         run: |
+          set -euo pipefail
+          which aarch64-linux-musl-gcc
+          which aarch64-linux-musl-g++
+          which aarch64-linux-musl-ar
           cargo +stable build --release --target aarch64-unknown-linux-musl
           file target/aarch64-unknown-linux-musl/release/csqtt
 
