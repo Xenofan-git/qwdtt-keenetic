@@ -34,20 +34,19 @@ jobs:
           test "$(grep -c 'pub const TUN_IFACE: &str = \"csqtt2\";' rust-server/tun_device.rs)" -eq 1
           test "$(grep -c '10.66.68.0/24' rust-server/tun_device.rs)" -eq 1
 
-      - name: Verify Docker
-        run: docker version
-
-      - name: Pull ARM64 musl build image
+      - name: Verify ARM64 musl toolchain
         run: |
           set -euo pipefail
-          docker pull ghcr.io/blackdex/rust-musl:aarch64-musl-stable
-          docker run --rm ghcr.io/blackdex/rust-musl:aarch64-musl-stable sh -lc '
+          docker pull ghcr.io/rust-cross/rust-musl-cross:aarch64-musl
+          docker run --rm ghcr.io/rust-cross/rust-musl-cross:aarch64-musl sh -lc '
             set -eu
             rustc --version
             cargo --version
-            aarch64-linux-musl-gcc --version
-            aarch64-linux-musl-g++ --version
-            aarch64-linux-musl-ar --version
+            rustup target list --installed | grep -F aarch64-unknown-linux-musl
+            command -v aarch64-unknown-linux-musl-gcc
+            command -v aarch64-unknown-linux-musl-g++
+            command -v aarch64-unknown-linux-musl-ar
+            aarch64-unknown-linux-musl-gcc --version
           '
 
       - name: Build ARM64 server
@@ -56,9 +55,10 @@ jobs:
           docker run --rm \
             -v "$PWD/upstream-csqtt/rust-server:/home/rust/src" \
             -w /home/rust/src \
-            ghcr.io/blackdex/rust-musl:aarch64-musl-stable \
+            ghcr.io/rust-cross/rust-musl-cross:aarch64-musl \
             cargo build --release
           file upstream-csqtt/rust-server/target/aarch64-unknown-linux-musl/release/csqtt
+          readelf -h upstream-csqtt/rust-server/target/aarch64-unknown-linux-musl/release/csqtt | grep -E 'Class:|Machine:'
 
       - name: Stage package
         run: |
