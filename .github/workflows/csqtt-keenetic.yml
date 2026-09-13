@@ -71,11 +71,7 @@ jobs:
               "$GCC" -print-file-name=libgcc.a
               "$GCC" -print-file-name=libgcc_s.so
               mkdir -p .cargo
-              cat > .cargo/config.toml <<EOF
-[target.aarch64-unknown-linux-musl]
-linker = "$GCC"
-rustflags = ["-C", "link-self-contained=no"]
-EOF
+              printf '%s\n' '[target.aarch64-unknown-linux-musl]' 'linker = "aarch64-unknown-linux-musl-gcc"' 'rustflags = ["-C", "link-self-contained=no"]' > .cargo/config.toml
               cat .cargo/config.toml
               export RUSTFLAGS="-C link-arg=-Wl,--allow-multiple-definition"
               export CARGO_TARGET_AARCH64_UNKNOWN_LINUX_MUSL_LINKER="$GCC"
