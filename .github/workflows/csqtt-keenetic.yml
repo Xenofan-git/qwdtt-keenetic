@@ -23,8 +23,16 @@ jobs:
       - name: Apply Keenetic TUN isolation
         working-directory: upstream-csqtt
         run: |
-          patch -p1 < ../csqtt/patches/keenetic-tun.patch
-          grep -n 'TUN_IFACE\|TUN_ADDR\|TUN_SUBNET' rust-server/net_setup.rs rust-server/tun_device.rs
+          set -euo pipefail
+          sed -i 's/pub const TUN_IFACE: \&str = "csqtt1";/pub const TUN_IFACE: \&str = "csqtt2";/' rust-server/net_setup.rs
+          sed -i 's/pub const TUN_ADDR: \&str = "10.66.67.1";/pub const TUN_ADDR: \&str = "10.66.68.1";/' rust-server/net_setup.rs
+          sed -i 's/pub const TUN_IFACE: \&str = "csqtt1";/pub const TUN_IFACE: \&str = "csqtt2";/' rust-server/tun_device.rs
+          sed -i 's/pub const TUN_SUBNET: \&str = "10.66.67.0\/24";/pub const TUN_SUBNET: \&str = "10.66.68.0\/24";/' rust-server/tun_device.rs
+          sed -i 's/const SUBNET_PREFIX: \[u8; 3\] = \[10, 66, 67\];/const SUBNET_PREFIX: [u8; 3] = [10, 66, 68];/' rust-server/tun_device.rs
+          grep -n 'TUN_IFACE\|TUN_ADDR\|TUN_SUBNET\|SUBNET_PREFIX' rust-server/net_setup.rs rust-server/tun_device.rs
+          test "$(grep -c 'pub const TUN_IFACE: &str = \"csqtt2\";' rust-server/net_setup.rs)" -eq 1
+          test "$(grep -c 'pub const TUN_IFACE: &str = \"csqtt2\";' rust-server/tun_device.rs)" -eq 1
+          test "$(grep -c '10.66.68.0/24' rust-server/tun_device.rs)" -eq 1
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
