@@ -53,11 +53,12 @@ jobs:
         run: |
           set -euo pipefail
           docker run --rm \
-            -v "$PWD/upstream-csqtt/rust-server:/home/rust/src" \
-            -w /home/rust/src \
+            -v "$PWD/upstream-csqtt:/home/rust" \
+            -w /home/rust/rust-server \
             ghcr.io/rust-cross/rust-musl-cross:aarch64-musl \
             sh -lc '
               set -eux
+              test -f ../shared/flow_frame.rs
               TOOLCHAIN="1.97.1"
               rustup toolchain install "$TOOLCHAIN" --target aarch64-unknown-linux-musl --profile minimal
               rustup target list --installed --toolchain "$TOOLCHAIN" | grep -F aarch64-unknown-linux-musl
