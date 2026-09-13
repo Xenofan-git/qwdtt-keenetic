@@ -39,10 +39,9 @@ jobs:
         with:
           targets: aarch64-unknown-linux-musl
 
-      - name: Verify and install ARM64 Rust target
+      - name: Verify ARM64 Rust target
         run: |
           set -euo pipefail
-          rustup target add aarch64-unknown-linux-musl
           rustup target list --installed
           TARGET_LIBDIR="$(rustc +stable --print sysroot)/lib/rustlib/aarch64-unknown-linux-musl/lib"
           test -d "$TARGET_LIBDIR"
@@ -57,7 +56,7 @@ jobs:
         env:
           RUSTFLAGS: '-C target-feature=+crt-static'
         run: |
-          cargo build --release --target aarch64-unknown-linux-musl
+          cargo +stable build --release --target aarch64-unknown-linux-musl
           file target/aarch64-unknown-linux-musl/release/csqtt
 
       - name: Stage package
