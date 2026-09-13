@@ -56,7 +56,14 @@ jobs:
             -v "$PWD/upstream-csqtt/rust-server:/home/rust/src" \
             -w /home/rust/src \
             ghcr.io/rust-cross/rust-musl-cross:aarch64-musl \
-            cargo build --release
+            sh -lc '
+              set -eux
+              TOOLCHAIN="1.97.1"
+              rustup toolchain install "$TOOLCHAIN" --target aarch64-unknown-linux-musl --profile minimal
+              rustup target list --installed --toolchain "$TOOLCHAIN" | grep -F aarch64-unknown-linux-musl
+              rustc +"$TOOLCHAIN" --version
+              cargo +"$TOOLCHAIN" build --release --target aarch64-unknown-linux-musl
+            '
           file upstream-csqtt/rust-server/target/aarch64-unknown-linux-musl/release/csqtt
           readelf -h upstream-csqtt/rust-server/target/aarch64-unknown-linux-musl/release/csqtt | grep -E 'Class:|Machine:'
 
