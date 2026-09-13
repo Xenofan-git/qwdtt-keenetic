@@ -70,9 +70,16 @@ jobs:
               test -f "$LIBGCC_DIR/libgcc_eh.a" || true
               "$GCC" -print-file-name=libgcc.a
               "$GCC" -print-file-name=libgcc_s.so
-              export RUSTFLAGS="-C link-arg=-Wl,--allow-multiple-definition -C link-arg=-Wl,--start-group -C link-arg=$LIBGCC_DIR/libgcc.a -C link-arg=-Wl,--end-group"
+              mkdir -p .cargo
+              cat > .cargo/config.toml <<EOF
+[target.aarch64-unknown-linux-musl]
+linker = "$GCC"
+rustflags = ["-C", "link-self-contained=no"]
+EOF
+              cat .cargo/config.toml
+              export RUSTFLAGS="-C link-arg=-Wl,--allow-multiple-definition"
               export CARGO_TARGET_AARCH64_UNKNOWN_LINUX_MUSL_LINKER="$GCC"
-              cargo +"$TOOLCHAIN" build --release --target aarch64-unknown-linux-musl
+              cargo +"$TOOLCHAIN" build --release --target aarch64-unknown-linux-musl --verbose
             '
           file upstream-csqtt/rust-server/target/aarch64-unknown-linux-musl/release/csqtt
           readelf -h upstream-csqtt/rust-server/target/aarch64-unknown-linux-musl/release/csqtt | grep -E 'Class:|Machine:'
