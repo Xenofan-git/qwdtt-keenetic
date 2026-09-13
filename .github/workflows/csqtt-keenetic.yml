@@ -39,6 +39,14 @@ jobs:
         with:
           targets: aarch64-unknown-linux-musl
 
+      - name: Verify and install ARM64 Rust target
+        run: |
+          set -euo pipefail
+          rustup target add aarch64-unknown-linux-musl
+          rustup target list --installed
+          test -d "$(rustc --print sysroot)/lib/rustlib/aarch64-unknown-linux-musl/lib"
+          test -f "$(rustc --print sysroot)/lib/rustlib/aarch64-unknown-linux-musl/lib/libcore.rlib"
+
       - name: Install musl linker
         run: sudo apt-get update && sudo apt-get install -y musl-tools
 
