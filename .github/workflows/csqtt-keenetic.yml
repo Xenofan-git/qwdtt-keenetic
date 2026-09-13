@@ -44,8 +44,10 @@ jobs:
           set -euo pipefail
           rustup target add aarch64-unknown-linux-musl
           rustup target list --installed
-          test -d "$(rustc --print sysroot)/lib/rustlib/aarch64-unknown-linux-musl/lib"
-          test -f "$(rustc --print sysroot)/lib/rustlib/aarch64-unknown-linux-musl/lib/libcore.rlib"
+          TARGET_LIBDIR="$(rustc +stable --print sysroot)/lib/rustlib/aarch64-unknown-linux-musl/lib"
+          test -d "$TARGET_LIBDIR"
+          test -n "$(find "$TARGET_LIBDIR" -maxdepth 1 -name 'libcore-*.rlib' -print -quit)"
+          rustc +stable --target aarch64-unknown-linux-musl --version
 
       - name: Install musl linker
         run: sudo apt-get update && sudo apt-get install -y musl-tools
