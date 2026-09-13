@@ -1,0 +1,64 @@
+name: Build CSQTT-Keenetic
+
+on:
+  push:
+    branches: [ csqtt-keenetic ]
+    paths:
+      - 'csqtt/**'
+      - '.github/workflows/csqtt-keenetic.yml'
+  workflow_dispatch:
+
+jobs:
+  build-arm64:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Checkout pinned CSQTT source
+        run: |
+          git clone https://github.com/amurcanov/csqtt.git upstream-csqtt
+          cd upstream-csqtt
+          git checkout 446293a
+
+      - name: Apply Keenetic TUN isolation
+        working-directory: upstream-csqtt
+        run: |
+          patch -p1 < ../csqtt/patches/keenetic-tun.patch
+          grep -n 'TUN_IFACE\|TUN_ADDR\|TUN_SUBNET' rust-server/net_setup.rs rust-server/tun_device.rs
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-unknown-linux-musl
+
+      - name: Install musl linker
+        run: sudo apt-get update && sudo apt-get install -y musl-tools
+
+      - name: Build ARM64 server
+        working-directory: upstream-csqtt/rust-server
+        env:
+          RUSTFLAGS: '-C target-feature=+crt-static'
+        run: |
+          cargo build --release --target aarch64-unknown-linux-musl
+          file target/aarch64-unknown-linux-musl/release/csqtt
+
+      - name: Stage package
+        run: |
+          rm -rf dist
+          mkdir -p dist/csqtt-keenetic/opt/bin
+          mkdir -p dist/csqtt-keenetic/usr/local/lib/csqtt-keenetic
+          mkdir -p dist/csqtt-keenetic/etc/systemd/system
+          cp upstream-csqtt/rust-server/target/aarch64-unknown-linux-musl/release/csqtt dist/csqtt-keenetic/opt/bin/csqtt-keenetic
+          cp csqtt/install/network-up.sh dist/csqtt-keenetic/usr/local/lib/csqtt-keenetic/network-up.sh
+          cp csqtt/install/tun-recover.sh dist/csqtt-keenetic/usr/local/lib/csqtt-keenetic/tun-recover.sh
+          cp csqtt/install/csqtt-keenetic.service dist/csqtt-keenetic/etc/systemd/system/csqtt-keenetic.service
+          chmod 0755 dist/csqtt-keenetic/opt/bin/csqtt-keenetic
+          chmod 0755 dist/csqtt-keenetic/usr/local/lib/csqtt-keenetic/*.sh
+          tar -C dist -czf csqtt-keenetic-arm64.tar.gz csqtt-keenetic
+          sha256sum csqtt-keenetic-arm64.tar.gz
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v6
+        with:
+          name: csqtt-keenetic-arm64
+          path: csqtt-keenetic-arm64.tar.gz
