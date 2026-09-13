@@ -48,13 +48,21 @@ jobs:
           test -n "$(find "$TARGET_LIBDIR" -maxdepth 1 -name 'libcore-*.rlib' -print -quit)"
           rustc +stable --target aarch64-unknown-linux-musl --version
 
-      - name: Install musl linker
-        run: sudo apt-get update && sudo apt-get install -y musl-tools
+      - name: Install ARM64 musl cross compiler
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-aarch64-linux-gnu
+          sudo ln -sf /usr/bin/aarch64-linux-gnu-gcc /usr/local/bin/aarch64-linux-musl-gcc
+          sudo ln -sf /usr/bin/aarch64-linux-gnu-g++ /usr/local/bin/aarch64-linux-musl-g++
+          aarch64-linux-musl-gcc --version
 
       - name: Build ARM64 server
         working-directory: upstream-csqtt/rust-server
         env:
           RUSTFLAGS: '-C target-feature=+crt-static'
+          CC_aarch64_unknown_linux_musl: aarch64-linux-musl-gcc
+          CXX_aarch64_unknown_linux_musl: aarch64-linux-musl-g++
+          AR_aarch64_unknown_linux_musl: aarch64-linux-gnu-ar
         run: |
           cargo +stable build --release --target aarch64-unknown-linux-musl
           file target/aarch64-unknown-linux-musl/release/csqtt
