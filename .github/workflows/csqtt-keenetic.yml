@@ -63,9 +63,15 @@ jobs:
               rustup toolchain install "$TOOLCHAIN" --target aarch64-unknown-linux-musl --profile minimal
               rustup target list --installed --toolchain "$TOOLCHAIN" | grep -F aarch64-unknown-linux-musl
               rustc +"$TOOLCHAIN" --version
-              export RUSTFLAGS="-C link-arg=-Wl,--allow-multiple-definition"
-              export CARGO_TARGET_AARCH64_UNKNOWN_LINUX_MUSL_RUSTFLAGS="-C link-arg=-Wl,-z,muldefs"
-              export CARGO_TARGET_AARCH64_UNKNOWN_LINUX_MUSL_LINKER="aarch64-unknown-linux-musl-gcc"
+              GCC="aarch64-unknown-linux-musl-gcc"
+              LIBGCC_DIR="$($GCC -print-libgcc-file-name | xargs dirname)"
+              echo "LIBGCC_DIR=$LIBGCC_DIR"
+              test -f "$LIBGCC_DIR/libgcc.a"
+              test -f "$LIBGCC_DIR/libgcc_eh.a" || true
+              "$GCC" -print-file-name=libgcc.a
+              "$GCC" -print-file-name=libgcc_s.so
+              export RUSTFLAGS="-C link-arg=-Wl,--allow-multiple-definition -C link-arg=-Wl,--start-group -C link-arg=$LIBGCC_DIR/libgcc.a -C link-arg=-Wl,--end-group"
+              export CARGO_TARGET_AARCH64_UNKNOWN_LINUX_MUSL_LINKER="$GCC"
               cargo +"$TOOLCHAIN" build --release --target aarch64-unknown-linux-musl
             '
           file upstream-csqtt/rust-server/target/aarch64-unknown-linux-musl/release/csqtt
