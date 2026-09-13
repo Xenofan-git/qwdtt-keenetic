@@ -9,9 +9,9 @@ StartLimitBurst=3
 Type=simple
 EnvironmentFile=-/etc/csqtt-keenetic/csqtt.env
 Environment=CSQTT_SERVICE_MANAGER=systemd
-ExecStartPre=/usr/local/lib/csqтt-keenetic/network-up.sh
-ExecStartPre=/usr/local/lib/csqтt-keenetic/tun-recover.sh
-ExecStart=/usr/local/bin/csqtt-keenetic --listen 0.0.0.0:47000 --web-port 47002 --config-dir /etc/csqтt-keenetic
+ExecStartPre=/usr/local/lib/csqtt-keenetic/network-up.sh
+ExecStartPre=/usr/local/lib/csqtt-keenetic/tun-recover.sh
+ExecStart=/usr/local/bin/csqtt-keenetic --listen 0.0.0.0:47000 --web-port 47002 --config-dir /etc/csqtt-keenetic
 Restart=on-failure
 RestartSec=3
 KillMode=control-group
