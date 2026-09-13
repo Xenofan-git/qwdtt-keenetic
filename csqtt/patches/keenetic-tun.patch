@@ -1,0 +1,19 @@
+diff --git a/rust-server/net_setup.rs b/rust-server/net_setup.rs
+--- a/rust-server/net_setup.rs
++++ b/rust-server/net_setup.rs
+@@
+-pub const TUN_IFACE: &str = "csqtt1";
+-pub const TUN_ADDR: &str = "10.66.67.1";
++pub const TUN_IFACE: &str = "csqtt2";
++pub const TUN_ADDR: &str = "10.66.68.1";
+
+diff --git a/rust-server/tun_device.rs b/rust-server/tun_device.rs
+--- a/rust-server/tun_device.rs
++++ b/rust-server/tun_device.rs
+@@
+-pub const TUN_IFACE: &str = "csqtt1";
+-pub const TUN_SUBNET: &str = "10.66.67.0/24";
+-const SUBNET_PREFIX: [u8; 3] = [10, 66, 67];
++pub const TUN_IFACE: &str = "csqtt2";
++pub const TUN_SUBNET: &str = "10.66.68.0/24";
++const SUBNET_PREFIX: [u8; 3] = [10, 66, 68];
