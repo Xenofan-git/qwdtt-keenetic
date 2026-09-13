@@ -63,6 +63,9 @@ jobs:
               rustup toolchain install "$TOOLCHAIN" --target aarch64-unknown-linux-musl --profile minimal
               rustup target list --installed --toolchain "$TOOLCHAIN" | grep -F aarch64-unknown-linux-musl
               rustc +"$TOOLCHAIN" --version
+              export RUSTFLAGS="-C link-arg=-Wl,--allow-multiple-definition"
+              export CARGO_TARGET_AARCH64_UNKNOWN_LINUX_MUSL_RUSTFLAGS="-C link-arg=-Wl,-z,muldefs"
+              export CARGO_TARGET_AARCH64_UNKNOWN_LINUX_MUSL_LINKER="aarch64-unknown-linux-musl-gcc"
               cargo +"$TOOLCHAIN" build --release --target aarch64-unknown-linux-musl
             '
           file upstream-csqtt/rust-server/target/aarch64-unknown-linux-musl/release/csqtt
