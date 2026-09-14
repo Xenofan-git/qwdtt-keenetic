@@ -56,7 +56,7 @@ jobs:
             -v "$PWD/upstream-csqtt:/home/rust" \
             -w /home/rust/rust-server \
             ghcr.io/rust-cross/rust-musl-cross:aarch64-musl \
-            sh -lc '
+            bash -lc '
               set -eux
               test -f ../shared/flow_frame.rs
               TOOLCHAIN="1.97.1"
@@ -70,10 +70,8 @@ jobs:
               test -f "$LIBGCC_DIR/libgcc_eh.a" || true
               "$GCC" -print-file-name=libgcc.a
               "$GCC" -print-file-name=libgcc_s.so
-              mkdir -p .cargo /tmp/csqtt-linker-lib
-              ln -sf "$LIBGCC_DIR/libgcc.a" /tmp/csqtt-linker-lib/libgcc_s.a
-              printf "%s\n" "#!/bin/sh" "for arg in \"\$@\"; do case \"\$arg\" in -lunwind) ;; -lgcc_s) set -- \"\$@\" ;; esac; done" > /tmp/csqtt-linker.sh
-              printf "%s\n" "#!/bin/sh" "args=()" "for arg in \"\$@\"; do [ \"\$arg\" = \"-lunwind\" ] && continue; [ \"\$arg\" = \"-lgcc_s\" ] && arg=\"$LIBGCC_DIR/libgcc.a\"; args=(\"\${args[@]}\" \"\$arg\"); done" "exec aarch64-unknown-linux-musl-gcc \"\${args[@]}\"" > /tmp/csqtt-linker.sh
+              mkdir -p .cargo
+              printf "%s\n" "#!/bin/bash" "set -e" "args=()" "for arg in \"\$@\"; do" "  [ \"\$arg\" = \"-lunwind\" ] && continue" "  if [ \"\$arg\" = \"-lgcc_s\" ]; then arg=\"$LIBGCC_DIR/libgcc.a\"; fi" "  args+=(\"\$arg\")" "done" "exec aarch64-unknown-linux-musl-gcc \"\${args[@]}\"" > /tmp/csqtt-linker.sh
               chmod 0755 /tmp/csqtt-linker.sh
               printf "%s\n" "[target.aarch64-unknown-linux-musl]" "linker = \"/tmp/csqtt-linker.sh\"" "rustflags = [\"-C\", \"link-self-contained=no\"]" > .cargo/config.toml
               cat .cargo/config.toml
