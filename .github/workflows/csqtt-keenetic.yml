@@ -72,10 +72,7 @@ jobs:
               "$GCC" -print-file-name=libgcc_s.so
               mkdir -p .cargo /tmp/csqtt-linker-lib
               ln -sf "$LIBGCC_DIR/libgcc.a" /tmp/csqtt-linker-lib/libgcc_s.a
-              cat > /tmp/csqtt-linker.sh <<"EOF"
-#!/bin/sh
-exec aarch64-unknown-linux-musl-gcc -L/tmp/csqtt-linker-lib "$@"
-EOF
+              printf "%s\n" "#!/bin/sh" "exec aarch64-unknown-linux-musl-gcc -L/tmp/csqtt-linker-lib \"\$@\"" > /tmp/csqtt-linker.sh
               chmod 0755 /tmp/csqtt-linker.sh
               printf "%s\n" "[target.aarch64-unknown-linux-musl]" "linker = \"/tmp/csqtt-linker.sh\"" "rustflags = [\"-C\", \"link-self-contained=no\"]" > .cargo/config.toml
               cat .cargo/config.toml
