@@ -72,11 +72,12 @@ jobs:
               "$GCC" -print-file-name=libgcc_s.so
               mkdir -p .cargo /tmp/csqtt-linker-lib
               ln -sf "$LIBGCC_DIR/libgcc.a" /tmp/csqtt-linker-lib/libgcc_s.a
-              printf "%s\n" "#!/bin/sh" "exec aarch64-unknown-linux-musl-gcc -L/tmp/csqtt-linker-lib \"\$@\"" > /tmp/csqtt-linker.sh
+              printf "%s\n" "#!/bin/sh" "for arg in \"\$@\"; do case \"\$arg\" in -lunwind) ;; -lgcc_s) set -- \"\$@\" ;; esac; done" > /tmp/csqtt-linker.sh
+              printf "%s\n" "#!/bin/sh" "args=()" "for arg in \"\$@\"; do [ \"\$arg\" = \"-lunwind\" ] && continue; [ \"\$arg\" = \"-lgcc_s\" ] && arg=\"$LIBGCC_DIR/libgcc.a\"; args=(\"\${args[@]}\" \"\$arg\"); done" "exec aarch64-unknown-linux-musl-gcc \"\${args[@]}\"" > /tmp/csqtt-linker.sh
               chmod 0755 /tmp/csqtt-linker.sh
               printf "%s\n" "[target.aarch64-unknown-linux-musl]" "linker = \"/tmp/csqtt-linker.sh\"" "rustflags = [\"-C\", \"link-self-contained=no\"]" > .cargo/config.toml
               cat .cargo/config.toml
-              ls -l /tmp/csqtt-linker-lib/libgcc_s.a /tmp/csqtt-linker.sh
+              cat /tmp/csqtt-linker.sh
               export RUSTFLAGS="-C link-self-contained=no -C link-arg=-Wl,--allow-multiple-definition"
               export CARGO_TARGET_AARCH64_UNKNOWN_LINUX_MUSL_LINKER="/tmp/csqtt-linker.sh"
               cargo +"$TOOLCHAIN" build --release --target aarch64-unknown-linux-musl --verbose
